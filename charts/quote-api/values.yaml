@@ -3,7 +3,7 @@ image:
   repository: ghcr.io/thaobk54/quote-api
   # Immutable git-SHA tag. Bumped by CI (.github/workflows/ci.yml) in a commit,
   # which ArgoCD then syncs - the cluster never runs a floating `latest`.
-  tag: "REPLACED_BY_CI"
+  tag: "aa2050ab5ab0"
   pullPolicy: IfNotPresent
 
 containerPort: 8000
