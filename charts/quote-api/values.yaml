@@ -1,0 +1,76 @@
+# Default values for quote-api.
+image:
+  repository: ghcr.io/thaobk54/quote-api
+  # Immutable git-SHA tag. Bumped by CI (.github/workflows/ci.yml) in a commit,
+  # which ArgoCD then syncs - the cluster never runs a floating `latest`.
+  tag: "REPLACED_BY_CI"
+  pullPolicy: IfNotPresent
+
+containerPort: 8000
+
+# Resources sized from the app's behaviour: each /api/quote burns ~100 ms CPU on
+# one thread, a pod (1 gunicorn worker, GIL-bound) tops out at ~1 core.
+resources:
+  requests:
+    cpu: 200m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3          # required by the assignment: survive losing one node
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  scaleDownStabilizationSeconds: 120
+
+pdb:
+  enabled: true
+  maxUnavailable: 1       # drains evict at most one replica at a time
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: traefik      # k3s' bundled ingress controller
+  host: ""                # empty = match any Host header (http://localhost:8080)
+  path: /
+
+# --- placement: spot preferred, >=1 replica on on-demand, soft node spread ----
+placement:
+  capacityLabel: acme.io/capacity
+  allowedCapacities: [spot, on-demand]   # hard: never GPU / unlabeled (server) nodes
+  preferredCapacity: spot                # soft: cost
+  preferredWeight: 100
+  # Hard spread across capacity types (maxSkew 1) guarantees >=1 replica on the
+  # on-demand pool whenever replicas >= 2. If every spot node disappears the
+  # spot domain disappears with it, so pods still schedule (no deadlock).
+  capacitySpreadMaxSkew: 1
+  # Soft spread across nodes: ScheduleAnyway so a drain never leaves pods Pending.
+  hostSpreadMaxSkew: 1
+
+networkPolicy:
+  enabled: true
+  # namespaces allowed to reach the pods on containerPort (ingress controller,
+  # and monitoring for Prometheus scrapes)
+  allowFromNamespaces: [kube-system, monitoring]
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+terminationGracePeriodSeconds: 30
+preStopSleepSeconds: 5    # let endpoints/ingress drop the pod before SIGTERM

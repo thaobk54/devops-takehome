@@ -1,0 +1,4 @@
+# Bắt buộc LF cho mọi file text: tránh lỗi "/usr/bin/env: 'sh\r'" khi clone trên Windows
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary

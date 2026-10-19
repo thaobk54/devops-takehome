@@ -1,0 +1,2 @@
+quote-api {{ .Values.image.tag }} deployed.
+  curl http://localhost:8080/api/quote

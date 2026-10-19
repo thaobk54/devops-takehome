@@ -1,0 +1,41 @@
+# One command brings up everything:  docker compose up -d
+# - toolbox: pinned CLIs (kubectl/helm/terraform/k6/k3d). On start it creates a
+#   k3d cluster (1 server + 4 agents) through the host Docker socket, labels the
+#   nodepools (troubleshoot/prepare.sh) and then idles. The repo is bind-mounted
+#   at /work, so ./scripts are always the host's current version.
+# - the k3d node containers are siblings on the host Docker (not nested), joined
+#   to the same network so the toolbox reaches the API by container name.
+name: devops-takehome
+
+services:
+  toolbox:
+    image: ghcr.io/${GH_OWNER:-thaobk54}/devops-toolbox:${TOOLBOX_TAG:-v1}
+    build: ./toolbox            # fallback if the image can't be pulled
+    container_name: devops-toolbox
+    entrypoint: ["bash", "/work/bootstrap/entrypoint.sh"]  # via bash: survives a lost exec bit on Windows
+    environment:
+      CLUSTER_NAME: acme
+      KUBECONFIG: /root/.kube/config
+      GH_OWNER: ${GH_OWNER:-thaobk54}
+      GH_REPO: ${GH_REPO:-devops-takehome}
+      GIT_REPO_URL: ${GIT_REPO_URL:-}
+      K3D_EXTRA_ARGS: ${K3D_EXTRA_ARGS:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/work
+      - kube:/root/.kube
+    networks: [k3d]
+    healthcheck:
+      test: ["CMD", "test", "-f", "/root/.kube/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  k3d:
+    name: k3d-acme-net
+
+volumes:
+  kube:

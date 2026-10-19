@@ -1,0 +1,6 @@
+apiVersion: v2
+name: quote-api
+description: quote-api service (DevOps take-home) - hand-written chart
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

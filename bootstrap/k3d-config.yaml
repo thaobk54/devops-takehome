@@ -1,0 +1,28 @@
+# k3d cluster definition: 1 server + 4 agents (agents become the simulated
+# spot/spot/on-demand/gpu nodepools after troubleshoot/prepare.sh runs).
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: acme
+servers: 1
+agents: 4
+image: rancher/k3s:v1.34.12-k3s1
+kubeAPI:
+  hostIP: "127.0.0.1"
+  hostPort: "6550"            # optional: kubectl from the host
+network: k3d-acme-net         # created by docker-compose, shared with the toolbox
+ports:
+  - port: 8080:80             # host:8080 -> k3d loadbalancer -> Traefik ingress
+    nodeFilters: [loadbalancer]
+options:
+  k3d:
+    wait: true
+    timeout: "300s"
+  k3s:
+    extraArgs:
+      # the toolbox reaches the API via the serverlb container name
+      - arg: --tls-san=k3d-acme-serverlb
+        nodeFilters: [server:*]
+  kubeconfig:
+    updateDefaultKubeconfig: false
+    switchCurrentContext: false

@@ -1,0 +1,33 @@
+# k3s ships Traefik as a SINGLE replica. During a spot reclaim, if that pod sits
+# on the drained node the ingress itself goes down even though the app has
+# replicas elsewhere. Make the ingress tier as resilient as the app:
+# 2 replicas, spread across nodes, PDB so drains evict one at a time, and a
+# graceful shutdown: on SIGTERM Traefik keeps accepting for 5s while the
+# endpoint removal propagates (without it the drill saw ~4% connection errors
+# exactly when a Traefik pod was evicted).
+# (HelmChartConfig = k3s' supported way to override its bundled charts.)
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    deployment:
+      replicas: 2
+    ports:
+      web:
+        transport:
+          lifeCycle:
+            requestAcceptGraceTimeout: 5s
+            graceTimeOut: 10s
+    podDisruptionBudget:
+      enabled: true
+      maxUnavailable: 1
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: traefik

@@ -1,0 +1,106 @@
+{{- if or (not .Values.image.tag) (eq .Values.image.tag "latest") }}
+{{- fail "image.tag must be an immutable git SHA (not empty, not 'latest')" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "quote-api.fullname" . }}
+  labels: {{- include "quote-api.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.autoscaling.minReplicas }}
+  {{- end }}
+  {{- /* replicas omitted when HPA is on: otherwise every ArgoCD sync would fight the HPA */}}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0     # never drop below current capacity during a rollout
+      maxSurge: 1
+  selector:
+    matchLabels: {{- include "quote-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "quote-api.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.containerPort | quote }}
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: {{ include "quote-api.fullname" . }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.placement }}
+      affinity:
+        nodeAffinity:
+          # HARD: only spot / on-demand pools (keeps us off GPU + server nodes)
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: {{ .capacityLabel }}
+                    operator: In
+                    values: {{- toYaml .allowedCapacities | nindent 22 }}
+          # SOFT: prefer spot for cost
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: {{ .preferredWeight }}
+              preference:
+                matchExpressions:
+                  - key: {{ .capacityLabel }}
+                    operator: In
+                    values: [{{ .preferredCapacity }}]
+      topologySpreadConstraints:
+        # HARD across capacity types -> at least one replica on on-demand
+        - maxSkew: {{ .capacitySpreadMaxSkew }}
+          topologyKey: {{ .capacityLabel }}
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels: {{- include "quote-api.selectorLabels" $ | nindent 14 }}
+          matchLabelKeys: [pod-template-hash]   # count only the current ReplicaSet
+        # SOFT across nodes -> spread, but never block rescheduling on a drain
+        - maxSkew: {{ .hostSpreadMaxSkew }}
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{- include "quote-api.selectorLabels" $ | nindent 14 }}
+          matchLabelKeys: [pod-template-hash]
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          env:
+            - name: APP_VERSION
+              value: {{ .Values.image.tag | quote }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "{{ .Values.preStopSleepSeconds }}"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp       # only writable path (gunicorn heartbeat files)
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi

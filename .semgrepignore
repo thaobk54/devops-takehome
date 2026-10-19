@@ -1,0 +1,11 @@
+# Provided assignment fixtures - intentionally broken / insecure, not our code.
+# (Scanning them would make the gate permanently red, i.e. useless.)
+troubleshoot/
+ci/legacy.gitlab-ci.yml
+# test code
+tests/
+app/tests/
+# Local-only harness image: runs as root BY DESIGN (needs the host docker.sock
+# to create the k3d cluster); never deployed. Semgrep's nosemgrep comments are
+# not honoured in Dockerfiles, so the exception is scoped here, explicitly.
+toolbox/

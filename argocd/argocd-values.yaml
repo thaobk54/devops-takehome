@@ -1,0 +1,24 @@
+# Minimal ArgoCD for a laptop: no Dex/SSO, no notifications, single replicas.
+# Admin UI (optional): kubectl -n argocd port-forward svc/argocd-server 8081:80
+dex:
+  enabled: false
+notifications:
+  enabled: false
+applicationSet:
+  replicas: 1
+configs:
+  params:
+    server.insecure: true          # TLS terminates at the ingress in real setups
+    timeout.reconciliation: 60s    # poll git every minute (no webhooks locally)
+controller:
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+repoServer:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+server:
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+redis:
+  resources:
+    requests: {cpu: 20m, memory: 32Mi}
