@@ -25,7 +25,7 @@ I used AI heavily, as the assignment encourages, but in a deliberately constrain
 - Watched every CI run until it was green. When the first run failed, I did not accept "it works in the sandbox": the fix had to pass on the real CI runner first.
 
 ## Representative prompts that moved the work forward
-1. *"Read the assignment and plan it in small phases; each phase must have its own test cases. Code in Python with explanations. Setup and verification must run in a sandbox or directly on my machine."* This set the rule that nothing counts as done without a passing test. It produced `PLAN.md` and the test layers (`app/tests`, `tests/image`, `tests/static`, `tests/e2e`).
+1. *"Read the assignment and plan it in small phases; each phase must have its own test cases. Code in Python with explanations. Setup and verification must run in a sandbox or directly on my machine."* This set the rule that nothing counts as done without a passing test. It produced a phased plan with test cases per phase, and the test layers (`app/tests`, `tests/image`, `tests/static`, `tests/e2e`).
 2. *"Placement: prefer spot, at least one replica must stay on on-demand, and the spread must stay soft enough that rescheduling works when a node is drained. Explain why a hard constraint would break the drill."* I asked for the reasoning, not just YAML, so I could judge the trade-off myself. It led to a hard *capacity* spread plus a soft *hostname* spread, proven by `25-reclaim-drill.sh`.
 3. *"Save code to my repo only after it has been tested and the local run succeeds, before pushing to the remote."* This made my machine, not the AI's sandbox, the source of truth for "works". It is how the Windows/Git Bash path bug and the non-root CI bug were caught before submission.
 
