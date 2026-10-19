@@ -61,7 +61,7 @@ def test_validate_catches_v4_syntax(tmp_path):
     work = tmp_path / "cf"
     shutil.copytree(DIR, work, ignore=shutil.ignore_patterns(".terraform"))
     env = {**os.environ, "TF_DATA_DIR": str(tmp_path / "data"),
-           "TF_PLUGIN_CACHE_DIR": os.environ.get("TF_PLUGIN_CACHE_DIR", "/root/.cache/tf-plugins")}
+           "TF_PLUGIN_CACHE_DIR": os.environ.get("TF_PLUGIN_CACHE_DIR", os.path.expanduser("~/.cache/tf-plugins"))}
     os.makedirs(env["TF_PLUGIN_CACHE_DIR"], exist_ok=True)
     init = subprocess.run(["terraform", f"-chdir={work}", "init", "-backend=false", "-input=false"],
                           capture_output=True, text=True, env=env)
